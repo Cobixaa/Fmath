@@ -19,31 +19,59 @@ Enable OpenMP (optional):
 gcc -O3 -ffast-math -march=native -funroll-loops -fopenmp -DFMATH_ENABLE_OMP=1 -Iinclude src/fmath.c bench/bench.c -o fmath_bench -lm
 ```
 
-Quick Usage
------------
+Easy API
+--------
+Short names: define `FMATH_SHORT_NAMES` before including `fmath.h`.
+
 ```c
+#define FMATH_SHORT_NAMES 1
 #include "fmath.h"
 
-int main() {
-	fmath_init();
-	float x = 1.2345f;
-	float s = fmath_sinf(x);
-	float e = fmath_expf(x);
-	return (int)(s + e);
+void demo() {
+	fm_init();
+	float x = 1.2f;
+	float s = fm_sin(x);
+	float c = fm_cos(x);
+	float e = fm_exp(x);
+	float l = fm_log(x);
+	float r = fm_rsqrt(3.0f);
 }
 ```
 
-Design Highlights
------------------
-- Single LUT for `sinf`, `cosf` derived by phase shift (π/2), linear interpolation
-- `expf`: range reduction `x = n*ln2 + r`, 5th-order polynomial for `exp(r)`, `2^n` via exponent bits
-- `logf`: bit extraction into exponent/mantissa, polynomial `log(1+z)` on `[0,1)`
-- `rsqrtf`: Quake inverse square-root with one Newton step
-- Array APIs for throughput; optional OpenMP parallel-for
-- Compile-time knobs in `include/fmath.h`:
-  - `FMATH_TABLE_BITS` (default 12 -> 4096 entries)
-  - `FMATH_LUT_INIT_WITH_LIBM` (default 1)
-  - `FMATH_ENABLE_OMP` (default 0)
+Override libm (opt-in):
+
+```c
+#define FMATH_OVERRIDE_LIBM 1
+#include "fmath.h"   // sinf/cosf/expf/logf/sqrtf map to fmath versions
+```
+
+Array helpers:
+- `fmath_*_array(dst, src, count)` process arrays
+- With `FMATH_SHORT_NAMES`: `fm_*_arr(dst, src, n)` and `fm_*_aa(dst, src)` (count-of src)
+
+What’s Implemented (Fast Paths)
+-------------------------------
+- `sin, cos`: LUT (2^FMATH_TABLE_BITS, default 4096) + linear interpolation; `cos` via phase shift
+- `exp`: magic-bias range reduction r=x*log2(e)=n+f; cubic for 2^f; scale by 2^n via exponent bits
+- `log`: extract exponent/mantissa; 5-term `log(1+z)` polynomial
+- `rsqrt`: Quake constant + 1 Newton step
+- `sqrt`: `x * rsqrt(x)`
+- `rcp`: `1/x` (can be swapped for NR refine if desired)
+
+Tuning and Options
+------------------
+- `FMATH_TABLE_BITS` (default 12): LUT size for sin/cos
+- `FMATH_LUT_INIT_WITH_LIBM` (default 1): init LUT via `sinf`
+- `FMATH_ENABLE_OMP` (default 0): enable OpenMP for array functions
+- `FMATH_SHORT_NAMES`: short API aliases
+- `FMATH_OVERRIDE_LIBM`: redefine `sinf/cosf/expf/logf/sqrtf` to fmath variants
+
+Faster Than libm — Notes
+------------------------
+- The provided benchmark shows substantial speedups for sin/cos/log/sqrt/rsqrt/rcp.
+- `exp` now uses a very fast range-reduction with a short cubic and is competitive or faster. If your CPU/libc combination still outperforms, try:
+  - Add `-mfma` if supported; or build with `-ffp-contract=fast` (implicit with `-ffast-math`).
+  - Keep inputs within typical ranges (e.g., [-10, 10]) for best accuracy and speed.
 
 Tutorial: Fast Math Techniques
 ------------------------------
@@ -125,13 +153,11 @@ Tutorial: Fast Math Techniques
 
 Benchmarks
 ----------
-Run the included benchmark to compare `fmath` vs `libm` on large arrays (default 8M elements). Results vary by CPU, compiler, and flags.
+Run the included benchmark to compare `fmath` vs `libm` on large arrays. Results vary by CPU, compiler, and flags, but the aim is for every function to be faster than stock libm in hot loops.
 
 Accuracy Notes
 --------------
-- Approximations sacrifice some precision for speed; test for your workload.
-- `logf` and `expf` use moderate-degree polynomials and simple range reduction; if you need tighter bounds, consider higher-degree or piecewise polynomials.
-- `rsqrtf` uses one Newton step (good trade-off); add another step for higher accuracy.
+- Approximations trade precision for speed; test against your workload and add refinements (e.g., second Newton step for `rsqrt`) when needed.
 
 License
 -------

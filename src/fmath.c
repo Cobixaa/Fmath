@@ -95,17 +95,26 @@ float fmath_cosf(float x) {
 	return s0 + t * (s1 - s0);
 }
 
-// Fast expf using range reduction x = n*ln2 + r, |r| <= ln2/2, and 5th-order poly
-float fmath_expf(float x) {
-	// Clamp to avoid extreme overflow behavior
-	if (x > 88.0f) return INFINITY;        // ~expf overflow threshold for float
-	if (x < -100.0f) return 0.0f;          // underflow to 0
+// Fast expf using magic-bias range reduction r = x * log2(e) = n + f, f in [-0.5,0.5]
+// Approximate 2^f with a short cubic polynomial, then scale by 2^n via bit trick.
+FMATH_INLINE float fmath_expf_impl(float x) {
+	if (x > 88.0f) return INFINITY;      // avoid overflow
+	if (x < -100.0f) return 0.0f;        // underflow
 
-	int n = (int)(x * FMATH_INV_LN2 + (x >= 0.0f ? 0.5f : -0.5f));
-	float r = x - (float)n * FMATH_LN2;
-	// Polynomial: exp(r) ≈ 1 + r + r^2/2 + r^3/6 + r^4/24 + r^5/120
-	float p = 1.0f + r * (1.0f + r * (0.5f + r * (0.16666667163372f + r * (0.04166666790843f + r * 0.00833333376795f))));
-	// Compute 2^n quickly when in normal range; fallback to ldexpf otherwise
+	// r = x * log2(e) = n + f
+	float r = x * FMATH_INV_LN2;
+	// Round r to nearest integer using magic-bias trick
+	float rb = r + 12582912.0f;          // 2^23 * 1.5, works for |r| < 2^22
+	int n = (int)rb - 12582912;          // nearest integer to r
+	float f = r - (float)n;              // in approximately [-0.5, 0.5]
+
+	// 2^f ≈ 1 + f*(ln2 + f*(0.2402265 + f*0.0555041))
+	// Coefficients tuned for good speed/accuracy on [-0.5, 0.5]
+	float p = fmaf(0.05550410866f, f, 0.240226507f);
+	p = fmaf(p, f, 0.693147182f);
+	p = fmaf(p, f, 1.0f);
+
+	// two_n = 2^n via exponent bits (fast path), fallback to ldexpf otherwise
 	float two_n;
 	if (n >= -126 && n <= 127) {
 		uint32_t bits = (uint32_t)(n + 127) << 23;
@@ -113,7 +122,11 @@ float fmath_expf(float x) {
 	} else {
 		two_n = ldexpf(1.0f, n);
 	}
-	return p * two_n;
+	return two_n * p;
+}
+
+float fmath_expf(float x) {
+	return fmath_expf_impl(x);
 }
 
 // Fast logf using bit tricks: x = m * 2^e with m in [1,2). log(x)=e*ln2 + log(m)
@@ -192,7 +205,7 @@ void fmath_expf_array(float *dst, const float *src, size_t count) {
 	#if FMATH_ENABLE_OMP
 	#pragma omp parallel for schedule(static)
 	#endif
-	for (size_t i = 0; i < count; ++i) dst[i] = fmath_expf(src[i]);
+	for (size_t i = 0; i < count; ++i) dst[i] = fmath_expf_impl(src[i]);
 }
 
 void fmath_logf_array(float *dst, const float *src, size_t count) {

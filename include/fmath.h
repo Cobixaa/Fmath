@@ -60,6 +60,56 @@ void fmath_sqrtf_array(float *dst, const float *src, size_t count);
 void fmath_rsqrtf_array(float *dst, const float *src, size_t count);
 void fmath_rcpf_array(float *dst, const float *src, size_t count);
 
+// Easy API helpers
+#ifndef FMATH_COUNT_OF
+#define FMATH_COUNT_OF(arr) (sizeof(arr) / sizeof((arr)[0]))
+#endif
+
+#ifdef FMATH_SHORT_NAMES
+#define fm_init            fmath_init
+#define fm_sin             fmath_sinf
+#define fm_cos             fmath_cosf
+#define fm_exp             fmath_expf
+#define fm_log             fmath_logf
+#define fm_sqrt            fmath_sqrtf
+#define fm_rsqrt           fmath_rsqrtf
+#define fm_rcp             fmath_rcpf
+#define fm_sin_arr(dst, src, n)   fmath_sinf_array((dst), (src), (n))
+#define fm_cos_arr(dst, src, n)   fmath_cosf_array((dst), (src), (n))
+#define fm_exp_arr(dst, src, n)   fmath_expf_array((dst), (src), (n))
+#define fm_log_arr(dst, src, n)   fmath_logf_array((dst), (src), (n))
+#define fm_sqrt_arr(dst, src, n)  fmath_sqrtf_array((dst), (src), (n))
+#define fm_rsqrt_arr(dst, src, n) fmath_rsqrtf_array((dst), (src), (n))
+#define fm_rcp_arr(dst, src, n)   fmath_rcpf_array((dst), (src), (n))
+#define fm_sin_aa(dst, src)       fmath_sinf_array((dst), (src), FMATH_COUNT_OF(src))
+#define fm_cos_aa(dst, src)       fmath_cosf_array((dst), (src), FMATH_COUNT_OF(src))
+#define fm_exp_aa(dst, src)       fmath_expf_array((dst), (src), FMATH_COUNT_OF(src))
+#define fm_log_aa(dst, src)       fmath_logf_array((dst), (src), FMATH_COUNT_OF(src))
+#define fm_sqrt_aa(dst, src)      fmath_sqrtf_array((dst), (src), FMATH_COUNT_OF(src))
+#define fm_rsqrt_aa(dst, src)     fmath_rsqrtf_array((dst), (src), FMATH_COUNT_OF(src))
+#define fm_rcp_aa(dst, src)       fmath_rcpf_array((dst), (src), FMATH_COUNT_OF(src))
+#endif
+
+#ifdef FMATH_OVERRIDE_LIBM
+// Override common libm float entry points with fmath versions
+// Toggle by defining FMATH_OVERRIDE_LIBM before including this header
+#ifndef FMATH_NO_OVERRIDE_SIN
+#define sinf fmath_sinf
+#endif
+#ifndef FMATH_NO_OVERRIDE_COS
+#define cosf fmath_cosf
+#endif
+#ifndef FMATH_NO_OVERRIDE_EXP
+#define expf fmath_expf
+#endif
+#ifndef FMATH_NO_OVERRIDE_LOG
+#define logf fmath_logf
+#endif
+#ifndef FMATH_NO_OVERRIDE_SQRT
+#define sqrtf fmath_sqrtf
+#endif
+#endif
+
 #ifdef __cplusplus
 }
 #endif
