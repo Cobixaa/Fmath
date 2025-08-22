@@ -23,7 +23,7 @@ static inline uint32_t xorshift32(void) {
 
 static inline float randf_range(float a, float b) {
 	uint32_t r = xorshift32();
-	float t = (r >> 8) * (1.0f / 16777216.0f); // 24-bit mantissa
+	float t = (float)(r >> 8) * (1.0f / 16777216.0f); // 24-bit mantissa
 	return a + (b - a) * t;
 }
 

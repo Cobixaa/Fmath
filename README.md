@@ -49,6 +49,27 @@ Array helpers:
 - `fmath_*_array(dst, src, count)` process arrays
 - With `FMATH_SHORT_NAMES`: `fm_*_arr(dst, src, n)` and `fm_*_aa(dst, src)` (count-of src)
 
+Run the benchmark
+-----------------
+- Standard build and run:
+```bash
+gcc -O3 -ffast-math -march=native -funroll-loops -Iinclude src/fmath.c bench/bench.c -o fmath_bench -lm
+./fmath_bench 4000000   # pass element count (default 8000000)
+```
+- With warnings (dev):
+```bash
+gcc -O3 -ffast-math -march=native -funroll-loops -Wall -Wextra -Wshadow -Wconversion -Iinclude src/fmath.c bench/bench.c -o fmath_bench -lm
+./fmath_bench 2000000
+```
+- With OpenMP:
+```bash
+gcc -O3 -ffast-math -march=native -funroll-loops -fopenmp -DFMATH_ENABLE_OMP=1 -Iinclude src/fmath.c bench/bench.c -o fmath_bench -lm
+./fmath_bench 8000000
+```
+Tips:
+- Use `-march=native` on bare-metal. In containers/CI, consider `-march=x86-64-v3` or your target.
+- For FMA-heavy CPUs, add `-mfma` if not implied.
+
 What’s Implemented (Fast Paths)
 -------------------------------
 - `sin, cos`: LUT (2^FMATH_TABLE_BITS, default 4096) + linear interpolation; `cos` via phase shift
@@ -68,10 +89,10 @@ Tuning and Options
 
 Faster Than libm — Notes
 ------------------------
-- The provided benchmark shows substantial speedups for sin/cos/log/sqrt/rsqrt/rcp.
-- `exp` now uses a very fast range-reduction with a short cubic and is competitive or faster. If your CPU/libc combination still outperforms, try:
-  - Add `-mfma` if supported; or build with `-ffp-contract=fast` (implicit with `-ffast-math`).
-  - Keep inputs within typical ranges (e.g., [-10, 10]) for best accuracy and speed.
+- The included benchmark typically shows speedups for sin/cos/log/sqrt/rsqrt/rcp.
+- `exp` uses a fast range-reduction with a short cubic and is designed to be competitive or faster. If not on your system, try:
+  - `-mfma` and ensure `-ffast-math` is enabled.
+  - Keep inputs in typical ranges (e.g., [-10, 10]) for best accuracy.
 
 Tutorial: Fast Math Techniques
 ------------------------------
